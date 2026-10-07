@@ -2,8 +2,13 @@
 
 :root { --red: #ff3b3b; --sun: #ffb84d; }
 
-/* ---------- recommendation markers on the globe ---------- */
+/* ---------- sun + recommendation markers on the globe ---------- */
 
+.sun-marker {
+  width: 18px; height: 18px; border-radius: 50%; cursor: help;
+  background: radial-gradient(circle, #fff6d5 0 30%, var(--sun) 55%, transparent 72%);
+  box-shadow: 0 0 18px 6px rgba(255, 184, 77, 0.45), 0 0 50px 18px rgba(255, 184, 77, 0.15);
+}
 
 .rec-marker {
   width: 22px; height: 22px; padding: 0; cursor: pointer; /* positioned by MapLibre (absolute) */

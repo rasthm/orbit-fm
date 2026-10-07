@@ -31,36 +31,7 @@ function project(v: Vec3, view: View, Rsky: number): Pt | null {
   return { x: view.cx + (px / len) * r, y: view.cy - (py / len) * r, behind: along };
 }
 
-/**
- * Where to draw the Sun. Physically, when you face the sunlit side the Sun is behind you; instead
- * we keep it "far away but visible": it sits out in space beyond the limb on the lit side, and
- * only slips behind the globe (an eclipse glow) when it is genuinely behind the Earth.
- */
-function sunScreen(S: Vec3, view: View, w: number, h: number): Pt {
-  const along = -dot(S, view.C); // 1 = behind the Earth, -1 = behind the viewer
-  const β = Math.acos(Math.max(-1, Math.min(1, along))); // 0..π
-  let px = dot(S, view.E);
-  let py = dot(S, view.N);
-  let len = Math.hypot(px, py);
-  if (len < 1e-3) {
-    // Straight behind the viewer: pick the upper-left, like a classic key light.
-    px = -0.7;
-    py = 0.7;
-    len = 1;
-  }
-  const k = β <= Math.PI / 2 ? 1.9 * Math.sin(β) : 1.9 - 0.45 * ((β - Math.PI / 2) / (Math.PI / 2));
-  let d = view.R * k;
-  // Keep the disc on screen.
-  const ux = px / len;
-  const uy = -py / len;
-  const margin = Math.min(w, h) * 0.1;
-  const maxX = ux > 0 ? (w - margin - view.cx) / ux : ux < 0 ? (margin - view.cx) / ux : Infinity;
-  const maxY = uy > 0 ? (h - margin - view.cy) / uy : uy < 0 ? (margin - view.cy) / uy : Infinity;
-  d = Math.min(d, maxX, maxY);
-  return { x: view.cx + ux * d, y: view.cy + uy * d, behind: along };
-}
-
-type Shooting ={ x: number; y: number; dx: number; dy: number; born: number; life: number; len: number };
+type Shooting = { x: number; y: number; dx: number; dy: number; born: number; life: number; len: number };
 
 export function Space() {
   const backRef = useRef<HTMLCanvasElement>(null);
@@ -121,9 +92,10 @@ export function Space() {
 
       if (s.space) {
         for (const p of sky.planets) drawPlanet(g, project(p.v, view, Rsky), p.planet);
-        const sunPt = sunScreen(sky.sun, view, w, h);
+        // The Sun sits at its real direction in space, far beyond the Earth, like the Moon and planets.
+        const sunPt = project(sky.sun, view, Rsky);
         drawMoon(g, project(sky.moon, view, Rsky), sunPt, sky.moonLit, view);
-        drawSun(g, sunPt, Math.min(w, h), motion ? t : 0);
+        if (sunPt) drawSun(g, sunPt, Math.min(w, h), motion ? t : 0);
       }
 
       if (s.shootingStars && motion) {

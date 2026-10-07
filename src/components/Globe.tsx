@@ -7,7 +7,7 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { camera } from '../camera';
 import { ACCENTS, reducedMotion, settings } from '../settings';
 import { current, flyTarget, openPlace, places, placesById, selectedPlace, status } from '../store';
-import { NIGHT_BANDS, nightGeoJSON, subsolarPoint } from '../sun';
+import { NIGHT_BANDS, nightGeoJSON } from '../sun';
 import { recs } from '../taste';
 
 setWorkerUrl(mapWorkerUrl);
@@ -254,16 +254,11 @@ export function Globe() {
     map.on('moveend', spin);
     for (const ev of ['mousedown', 'touchstart', 'wheel'] as const) map.on(ev, halt);
 
-    // ---- markers: now playing, the sun, and "For You" recommendations ----
+    // ---- markers: now playing and "For You" recommendations ----
     const markerEl = document.createElement('div');
     markerEl.className = 'live-marker';
     markerEl.innerHTML = '<span></span><span></span><i></i>';
     const marker = new Marker({ element: markerEl });
-
-    const sunEl = document.createElement('div');
-    sunEl.className = 'sun-marker';
-    sunEl.title = 'The sun is directly overhead here';
-    const sunMarker = new Marker({ element: sunEl });
 
     let recMarkers: Marker[] = [];
 
@@ -272,8 +267,6 @@ export function Globe() {
     const updateSun = () => {
       const src = map.getSource('night') as GeoJSONSource | undefined;
       src?.setData(nightGeoJSON());
-      const sun = subsolarPoint();
-      sunMarker.setLngLat([sun.lon, sun.lat]);
     };
     const sunTimer = setInterval(updateSun, 60_000);
 
@@ -293,12 +286,7 @@ export function Globe() {
         effect(() => {
           const s = settings.value;
           applyDayNight(map, s.dayNight);
-          if (s.dayNight === 'real') {
-            updateSun();
-            sunMarker.addTo(map);
-          } else {
-            sunMarker.remove();
-          }
+          if (s.dayNight === 'real') updateSun();
           const vis = s.labels ? 'visible' : 'none';
           map.setLayoutProperty('country-labels', 'visibility', vis);
           map.setLayoutProperty('city-labels', 'visibility', vis);

@@ -4,6 +4,7 @@ import { Map as MapLibre, Marker, setWorkerUrl, type GeoJSONSource, type StyleSp
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre 6 looks for its worker next to its own module, which no longer exists once bundled.
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { camera } from '../camera';
 import { ACCENTS, reducedMotion, settings } from '../settings';
 import { current, flyTarget, openPlace, places, placesById, selectedPlace, status } from '../store';
 import { NIGHT_BANDS, nightGeoJSON, subsolarPoint } from '../sun';
@@ -17,11 +18,11 @@ const CYAN = '#2ce8ff';
 /** Base map colours. "Real" mode paints the day palette and darkens the night side on top. */
 const PALETTES = {
   night: { land: '#11111c', water: '#06060c', border: '#3b2f6b', label: '#55557a', city: '#6a6a90' },
-  day: { land: '#1c2a45', water: '#0a2647', border: '#4c66a8', label: '#8ea5cf', city: '#a3b6dc' },
+  day: { land: '#142236', water: '#0e5aa6', border: '#7fa8ec', label: '#c6d8f5', city: '#d4e2f7' },
 };
 
-// Each band adds a little darkness; together they reach ~60% at full night.
-const NIGHT_LAYERS = NIGHT_BANDS.map((alt) => ({ alt, opacity: 0.088 }));
+// Each band adds a little darkness; together they reach ~70% at full night.
+const NIGHT_LAYERS = NIGHT_BANDS.map((alt) => ({ alt, opacity: 0.115 }));
 
 const STYLE: StyleSpecification = {
   version: 8,
@@ -231,6 +232,7 @@ export function Globe() {
       pitchWithRotate: false,
     });
     map.touchZoomRotate.disableRotation();
+    camera.map = map;
 
     // ---- idle auto-spin, paused as soon as the user touches the globe ----
     let spinning = true;
@@ -376,6 +378,7 @@ export function Globe() {
       disposers.forEach((d) => d());
       clearTimeout(resumeTimer);
       clearInterval(sunTimer);
+      camera.map = null;
       map.remove();
     };
   }, []);

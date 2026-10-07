@@ -211,6 +211,8 @@ export function SettingsPanel() {
               <Segmented k="spinSpeed" label="Spin speed" options={[[1, 'Slow'], [2, 'Normal'], [3, 'Fast']]} />
             )}
             <Toggle k="labels" label="Country & city names" />
+            <Toggle k="space" label="Sun, Moon & planets" hint="Shown where they really are in the sky right now" />
+            <Toggle k="shootingStars" label="Shooting stars" />
             <Toggle k="showForYou" label="Show For You rings" hint="Red rings mark stations picked for you" />
           </Section>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Globe } from './components/Globe';
+import { Space } from './components/Space';
 import { IconLibrary, IconSearch, IconSettings } from './components/icons';
 import { LibraryPanel } from './components/LibraryPanel';
 import { PlacePanel } from './components/PlacePanel';
@@ -119,6 +120,7 @@ export function App() {
 
   return (
     <div class={`app${deckOpen.value ? ' deck-open' : ''}`}>
+      <Space />
       <Globe />
       <div class="vignette" aria-hidden="true" />
       {settings.value.scanlines && <div class="scanlines" aria-hidden="true" />}

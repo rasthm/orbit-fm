@@ -10,6 +10,8 @@ export type Settings = {
   spinSpeed: 1 | 2 | 3;
   labels: boolean;
   showForYou: boolean;
+  space: boolean;
+  shootingStars: boolean;
   // look
   accent: Accent;
   visualizer: 'ring' | 'bars' | 'off';
@@ -35,6 +37,8 @@ export const DEFAULTS: Settings = {
   spinSpeed: 2,
   labels: true,
   showForYou: true,
+  space: true,
+  shootingStars: true,
   accent: 'acid',
   visualizer: 'ring',
   scanlines: true,

@@ -46,19 +46,19 @@ npm run deploy       # builds, then `wrangler deploy` → https://orbit-fm.<your
 
 ## Day & night
 
- computes the subsolar point from the current UTC time and draws the night side as ten stacked
+`src/sun.ts` computes the subsolar point from the current UTC time and draws the night side as ten stacked
 caps (sun altitude 0° → −18°), giving a soft twilight gradient that moves in real time (refreshed every minute).
 
 ## For You recommendations (all on-device)
 
 1. **Tracking**: every 5s of real playback is logged per station (time, 1min+ sessions, distinct days, quick skips).
-2. **Genres**: inferred from station names () plus Radio Browser tags looked up once per station you actually listen to.
+2. **Genres**: inferred from station names (`src/genres.ts`) plus Radio Browser tags looked up once per station you actually listen to.
 3. **Profile**: after 3 stations with 2+ minutes each; stations you return to on several days weigh more.
 4. **Picks**: radio.garden searches for your top genres / networks / countries, scored and diversified, shown as red rings on the globe and in Library → For you.
 
 ## Keyboard
 
- play/pause ·  search ·  /  next/previous ·  random scan ·  settings ·  close
+`Space` play/pause · `/` search · `N` / `P` next/previous · `R` random scan · `,` settings · `Esc` close
 
 ## Roadmap
 

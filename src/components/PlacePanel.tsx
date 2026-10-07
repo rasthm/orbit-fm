@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { closePlace, placeLoading, placesById, selectedPlace } from '../store';
-import { IconClose } from './icons';
+import { dayPhase } from '../sun';
+import { IconClose, IconMoon, IconSun } from './icons';
 import { StationRow } from './StationRow';
 
 function localTime(utcOffsetMin: number) {
@@ -28,7 +29,9 @@ export function PlacePanel() {
     );
   }
 
-  const country = placesById.value.get(place.id)?.country ?? place.stations[0]?.country ?? '';
+  const geo = placesById.value.get(place.id);
+  const country = geo?.country ?? place.stations[0]?.country ?? '';
+  const sky = geo ? dayPhase(geo) : null;
   const q = filter.trim().toLowerCase();
   const list = q ? place.stations.filter((s) => s.title.toLowerCase().includes(q)) : place.stations;
 
@@ -37,7 +40,14 @@ export function PlacePanel() {
       <div class="sheet-grip" aria-hidden="true" />
       <header class="sheet-head">
         <div>
-          <p class="kicker">{country} · {localTime(place.utcOffset)} local</p>
+          <p class="kicker">
+            {country} · {localTime(place.utcOffset)} local
+            {sky && (
+              <span class={`sky sky-${sky.phase}`} title={sky.phase === 'day' ? 'Daytime there' : sky.phase === 'twilight' ? 'Twilight there' : 'Night-time there'}>
+                {sky.phase === 'day' ? <IconSun size={13} /> : <IconMoon size={13} />}
+              </span>
+            )}
+          </p>
           <h2 class="sheet-title">{place.title}</h2>
           <p class="sheet-meta">{place.stations.length} live station{place.stations.length === 1 ? '' : 's'}</p>
         </div>

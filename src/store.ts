@@ -1,6 +1,8 @@
 import { computed, effect, signal } from '@preact/signals';
 import { fetchPlace, fetchPlaces, type Place, type PlaceDetail, type Station } from './api';
 import { audio, type PlayStatus } from './audio';
+import { settings } from './settings';
+import { TICK_INTERVAL, trackStationChange, trackTick } from './taste';
 
 // ---------- persistence helpers ----------
 
@@ -32,7 +34,11 @@ export const placesError = signal<string | null>(null);
 export const selectedPlace = signal<PlaceDetail | null>(null);
 export const placeLoading = signal<string | null>(null);
 
-export const current = signal<Station | null>(null);
+// With "resume last station" on, the last station is ready in the player (not auto-played:
+// browsers block audio until the listener interacts).
+export const current = signal<Station | null>(
+  settings.value.resumeLast ? load<Station | null>('orbit.last', null) : null,
+);
 export const status = signal<PlayStatus>('idle');
 export const analysed = signal(false);
 export const queue = signal<Station[]>([]);
@@ -41,7 +47,7 @@ export const volume = signal<number>(load('orbit.volume', 0.8));
 export const favorites = signal<Station[]>(load('orbit.favorites', []));
 export const recents = signal<Station[]>(load('orbit.recents', []));
 
-export type Panel = 'none' | 'search' | 'library';
+export type Panel = 'none' | 'search' | 'library' | 'settings';
 export const panel = signal<Panel>('none');
 export const deckOpen = signal(false);
 
@@ -53,13 +59,41 @@ export const sleepAt = signal<number | null>(null);
 persist('orbit.volume', volume);
 persist('orbit.favorites', favorites);
 persist('orbit.recents', recents);
+persist('orbit.last', current);
 
 effect(() => audio.setVolume(volume.value));
+effect(() => {
+  audio.fadeIn = settings.value.fadeIn;
+});
+
+let autoSkips = 0;
 
 audio.onStatus = (s, real) => {
   status.value = s;
   analysed.value = real;
+  if (s === 'playing') autoSkips = 0;
+  // Dead stream: hop to the next one in the list, but don't chain forever.
+  if (s === 'error' && settings.value.autoSkip && queue.value.length > 1 && autoSkips < 3) {
+    autoSkips++;
+    const failed = current.value;
+    setTimeout(() => current.value === failed && status.value === 'error' && step(1), 1500);
+  }
 };
+
+// ---------- listening tracker (feeds the taste profile) ----------
+
+let trackedStation: Station | null = null;
+effect(() => {
+  const st = current.value;
+  if (st?.id !== trackedStation?.id) {
+    trackStationChange(st, trackedStation);
+    trackedStation = st;
+  }
+});
+// Background listening (screen off, other tab) counts too.
+setInterval(() => {
+  if (status.value === 'playing' && current.value) trackTick(current.value);
+}, TICK_INTERVAL);
 
 export const isFavorite = (id: string) => favorites.value.some((s) => s.id === id);
 
@@ -111,7 +145,10 @@ export function playStation(station: Station, list?: Station[]) {
 }
 
 export function togglePlay() {
-  if (current.value) audio.toggle();
+  const st = current.value;
+  if (!st) return;
+  if (status.value === 'idle' || status.value === 'error') void audio.play(st);
+  else audio.toggle();
 }
 
 export function step(dir: 1 | -1) {

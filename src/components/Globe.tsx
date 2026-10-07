@@ -4,13 +4,24 @@ import { Map as MapLibre, Marker, setWorkerUrl, type GeoJSONSource, type StyleSp
 import 'maplibre-gl/dist/maplibre-gl.css';
 // MapLibre 6 looks for its worker next to its own module, which no longer exists once bundled.
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { ACCENTS, reducedMotion, settings } from '../settings';
+import { current, flyTarget, openPlace, places, placesById, selectedPlace, status } from '../store';
+import { NIGHT_BANDS, nightGeoJSON, subsolarPoint } from '../sun';
+import { recs } from '../taste';
 
 setWorkerUrl(mapWorkerUrl);
-import { current, flyTarget, openPlace, places, placesById, selectedPlace, status } from '../store';
 
-const NEON = '#b6ff3c';
 const MAGENTA = '#ff2bd6';
 const CYAN = '#2ce8ff';
+
+/** Base map colours. "Real" mode paints the day palette and darkens the night side on top. */
+const PALETTES = {
+  night: { land: '#11111c', water: '#06060c', border: '#3b2f6b', label: '#55557a', city: '#6a6a90' },
+  day: { land: '#1c2a45', water: '#0a2647', border: '#4c66a8', label: '#8ea5cf', city: '#a3b6dc' },
+};
+
+// Each band adds a little darkness; together they reach ~60% at full night.
+const NIGHT_LAYERS = NIGHT_BANDS.map((alt) => ({ alt, opacity: 0.088 }));
 
 const STYLE: StyleSpecification = {
   version: 8,
@@ -18,6 +29,7 @@ const STYLE: StyleSpecification = {
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
     omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
+    night: { type: 'geojson', data: nightGeoJSON() },
   },
   sky: {
     'sky-color': '#07070b',
@@ -26,13 +38,13 @@ const STYLE: StyleSpecification = {
     'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 5, 0.6, 7, 0],
   },
   layers: [
-    { id: 'land', type: 'background', paint: { 'background-color': '#11111c' } },
+    { id: 'land', type: 'background', paint: { 'background-color': PALETTES.day.land } },
     {
       id: 'water',
       type: 'fill',
       source: 'omt',
       'source-layer': 'water',
-      paint: { 'fill-color': '#06060c' },
+      paint: { 'fill-color': PALETTES.day.water },
     },
     {
       id: 'borders',
@@ -40,7 +52,22 @@ const STYLE: StyleSpecification = {
       source: 'omt',
       'source-layer': 'boundary',
       filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]],
-      paint: { 'line-color': '#3b2f6b', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 6, 1.2] },
+      paint: { 'line-color': PALETTES.day.border, 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.4, 6, 1.2] },
+    },
+    // Night side: four stacked caps (sunset, civil, nautical, astronomical twilight) give a soft gradient.
+    ...NIGHT_LAYERS.map(({ alt, opacity }) => ({
+      id: `night${alt}`,
+      type: 'fill' as const,
+      source: 'night',
+      filter: ['==', ['get', 'alt'], alt] as any,
+      paint: { 'fill-color': '#020208', 'fill-opacity': opacity, 'fill-antialias': false },
+    })),
+    {
+      id: 'terminator',
+      type: 'line',
+      source: 'night',
+      filter: ['==', ['get', 'alt'], 0],
+      paint: { 'line-color': '#ff9b3d', 'line-opacity': 0.35, 'line-width': 1.5, 'line-blur': 2 },
     },
     {
       id: 'country-labels',
@@ -56,7 +83,7 @@ const STYLE: StyleSpecification = {
         'text-transform': 'uppercase',
         'text-letter-spacing': 0.25,
       },
-      paint: { 'text-color': '#55557a', 'text-halo-color': '#07070b', 'text-halo-width': 1 },
+      paint: { 'text-color': PALETTES.day.label, 'text-halo-color': '#07070b', 'text-halo-width': 1 },
     },
     {
       id: 'city-labels',
@@ -71,7 +98,7 @@ const STYLE: StyleSpecification = {
         'text-size': 10,
         'text-offset': [0, 1.2],
       },
-      paint: { 'text-color': '#6a6a90', 'text-halo-color': '#07070b', 'text-halo-width': 1 },
+      paint: { 'text-color': PALETTES.day.city, 'text-halo-color': '#07070b', 'text-halo-width': 1 },
     },
   ],
 };
@@ -88,6 +115,7 @@ function toGeoJSON(): GeoJSON.FeatureCollection {
 }
 
 function addStationLayers(map: MapLibre) {
+  const accent = ACCENTS[settings.value.accent].color;
   map.addSource('places', {
     type: 'geojson',
     data: toGeoJSON(),
@@ -137,21 +165,27 @@ function addStationLayers(map: MapLibre) {
     paint: { 'text-color': CYAN },
   });
 
-  const pointRadius = ['interpolate', ['linear'], ['zoom'], 2, ['min', 6, ['+', 2.5, ['/', ['get', 'size'], 8]]], 8, ['min', 11, ['+', 4, ['/', ['get', 'size'], 5]]]] as any;
+  // Zoom expressions must be the top-level interpolate, so scaled variants are built per stop.
+  const pointRadius = (scale = 1, add = 0) =>
+    [
+      'interpolate', ['linear'], ['zoom'],
+      2, ['+', ['*', ['min', 6, ['+', 2.5, ['/', ['get', 'size'], 8]]], scale], add],
+      8, ['+', ['*', ['min', 11, ['+', 4, ['/', ['get', 'size'], 5]]], scale], add],
+    ] as any;
 
   map.addLayer({
     id: 'point-glow',
     type: 'circle',
     source: 'places',
     filter: ['!', ['has', 'point_count']],
-    paint: { 'circle-color': NEON, 'circle-radius': ['*', pointRadius, 2.4], 'circle-blur': 1, 'circle-opacity': 0.4 },
+    paint: { 'circle-color': accent, 'circle-radius': pointRadius(2.4), 'circle-blur': 1, 'circle-opacity': 0.4 },
   });
   map.addLayer({
     id: 'points',
     type: 'circle',
     source: 'places',
     filter: ['!', ['has', 'point_count']],
-    paint: { 'circle-color': NEON, 'circle-radius': pointRadius, 'circle-stroke-color': '#07070b', 'circle-stroke-width': 1 },
+    paint: { 'circle-color': accent, 'circle-radius': pointRadius(), 'circle-stroke-color': '#07070b', 'circle-stroke-width': 1 },
   });
   map.addLayer({
     id: 'point-selected',
@@ -160,11 +194,24 @@ function addStationLayers(map: MapLibre) {
     filter: ['==', ['get', 'id'], ''],
     paint: {
       'circle-color': 'transparent',
-      'circle-radius': ['+', pointRadius, 6],
+      'circle-radius': pointRadius(1, 6),
       'circle-stroke-color': MAGENTA,
       'circle-stroke-width': 2.5,
     },
   });
+}
+
+/** Applies the day/night mode: palette + whether the live night overlay is shown. */
+function applyDayNight(map: MapLibre, mode: 'real' | 'night' | 'day') {
+  const pal = mode === 'night' ? PALETTES.night : PALETTES.day;
+  map.setPaintProperty('land', 'background-color', pal.land);
+  map.setPaintProperty('water', 'fill-color', pal.water);
+  map.setPaintProperty('borders', 'line-color', pal.border);
+  map.setPaintProperty('country-labels', 'text-color', pal.label);
+  map.setPaintProperty('city-labels', 'text-color', pal.city);
+  const vis = mode === 'real' ? 'visible' : 'none';
+  for (const { alt } of NIGHT_LAYERS) map.setLayoutProperty(`night${alt}`, 'visibility', vis);
+  map.setLayoutProperty('terminator', 'visibility', vis);
 }
 
 export function Globe() {
@@ -189,9 +236,10 @@ export function Globe() {
     let spinning = true;
     let resumeTimer: ReturnType<typeof setTimeout>;
     const spin = () => {
-      if (!spinning || map.getZoom() > 3 || map.isMoving()) return;
+      const s = settings.value;
+      if (!spinning || !s.autoSpin || reducedMotion.value || map.getZoom() > 3 || map.isMoving()) return;
       const c = map.getCenter();
-      map.easeTo({ center: [c.lng + 4, c.lat], duration: 1000, easing: (t) => t });
+      map.easeTo({ center: [c.lng + 2 * s.spinSpeed, c.lat], duration: 1000, easing: (t) => t });
     };
     const halt = () => {
       spinning = false;
@@ -204,15 +252,31 @@ export function Globe() {
     map.on('moveend', spin);
     for (const ev of ['mousedown', 'touchstart', 'wheel'] as const) map.on(ev, halt);
 
-    // ---- playing marker (DOM element so it can pulse with CSS) ----
+    // ---- markers: now playing, the sun, and "For You" recommendations ----
     const markerEl = document.createElement('div');
     markerEl.className = 'live-marker';
     markerEl.innerHTML = '<span></span><span></span><i></i>';
     const marker = new Marker({ element: markerEl });
 
+    const sunEl = document.createElement('div');
+    sunEl.className = 'sun-marker';
+    sunEl.title = 'The sun is directly overhead here';
+    const sunMarker = new Marker({ element: sunEl });
+
+    let recMarkers: Marker[] = [];
+
     const disposers: (() => void)[] = [];
 
-    map.on('load', () => {
+    const updateSun = () => {
+      const src = map.getSource('night') as GeoJSONSource | undefined;
+      src?.setData(nightGeoJSON());
+      const sun = subsolarPoint();
+      sunMarker.setLngLat([sun.lon, sun.lat]);
+    };
+    const sunTimer = setInterval(updateSun, 60_000);
+
+    // 'style.load' (not 'load'): station dots shouldn't wait for every basemap tile to download.
+    map.once('style.load', () => {
       addStationLayers(map);
       spin();
 
@@ -223,6 +287,50 @@ export function Globe() {
         }),
         effect(() => {
           map.setFilter('point-selected', ['==', ['get', 'id'], selectedPlace.value?.id ?? '']);
+        }),
+        effect(() => {
+          const s = settings.value;
+          applyDayNight(map, s.dayNight);
+          if (s.dayNight === 'real') {
+            updateSun();
+            sunMarker.addTo(map);
+          } else {
+            sunMarker.remove();
+          }
+          const vis = s.labels ? 'visible' : 'none';
+          map.setLayoutProperty('country-labels', 'visibility', vis);
+          map.setLayoutProperty('city-labels', 'visibility', vis);
+          const accent = ACCENTS[s.accent].color;
+          map.setPaintProperty('points', 'circle-color', accent);
+          map.setPaintProperty('point-glow', 'circle-color', accent);
+          if (s.autoSpin) spin();
+        }),
+        effect(() => {
+          for (const m of recMarkers) m.remove();
+          recMarkers = [];
+          const s = settings.value;
+          if (!s.showForYou || !s.recommendations) return;
+          const byPlace = new Map<string, string[]>();
+          for (const r of recs.value) {
+            const list = byPlace.get(r.station.placeId) ?? [];
+            list.push(r.station.title);
+            byPlace.set(r.station.placeId, list);
+          }
+          for (const [placeId, titles] of byPlace) {
+            const p = placesById.value.get(placeId);
+            if (!p) continue;
+            const el = document.createElement('button');
+            el.className = 'rec-marker';
+            el.title = `For you: ${titles.join(', ')}`;
+            el.setAttribute('aria-label', `Recommended in ${p.title}: ${titles.join(', ')}`);
+            el.innerHTML = '<span></span><i></i>';
+            el.addEventListener('click', (e) => {
+              e.stopPropagation();
+              halt();
+              void openPlace(placeId, true);
+            });
+            recMarkers.push(new Marker({ element: el }).setLngLat([p.lon, p.lat]).addTo(map));
+          }
         }),
       );
 
@@ -250,7 +358,9 @@ export function Globe() {
         const t = flyTarget.value;
         if (!t) return;
         halt();
-        map.flyTo({ center: [t.lon, t.lat], zoom: Math.max(map.getZoom(), t.zoom ?? 4), speed: 1.4, essential: true });
+        const opts = { center: [t.lon, t.lat] as [number, number], zoom: Math.max(map.getZoom(), t.zoom ?? 4) };
+        if (reducedMotion.value) map.jumpTo(opts);
+        else map.flyTo({ ...opts, speed: 1.4, essential: true });
         flyTarget.value = null;
       }),
       effect(() => {
@@ -265,6 +375,7 @@ export function Globe() {
     return () => {
       disposers.forEach((d) => d());
       clearTimeout(resumeTimer);
+      clearInterval(sunTimer);
       map.remove();
     };
   }, []);

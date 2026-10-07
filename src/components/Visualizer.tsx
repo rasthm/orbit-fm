@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { audio } from '../audio';
+import { reducedMotion } from '../settings';
 import { status } from '../store';
 
 const BINS = 64;
@@ -30,7 +31,6 @@ export function Visualizer({ mode, class: cls }: Props) {
     const raw = new Uint8Array(256);
     const target = new Float32Array(BINS);
     const level = new Float32Array(BINS);
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let frame = 0;
 
     const resize = () => {
@@ -58,7 +58,7 @@ export function Visualizer({ mode, class: cls }: Props) {
       }
       for (let i = 0; i < BINS; i++) {
         const k = target[i] > level[i] ? 0.55 : 0.12;
-        level[i] += (target[i] - level[i]) * (reduced ? 0.05 : k);
+        level[i] += (target[i] - level[i]) * (reducedMotion.value ? 0.05 : k);
       }
 
       const { width: w, height: h } = canvas;

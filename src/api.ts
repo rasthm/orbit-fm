@@ -47,4 +47,7 @@ export const searchAll = (q: string, signal?: AbortSignal) =>
 export const resolveStream = (id: string, signal?: AbortSignal) =>
   get<{ url: string }>(`/resolve/${encodeURIComponent(id)}`, signal).then((r) => r.url);
 
+export const fetchTags = (name: string, country: string) =>
+  get<{ tags: string[] }>(`/tags?${new URLSearchParams({ name, country })}`).then((r) => r.tags);
+
 export const proxiedStreamUrl = (id: string) => `/api/stream/${encodeURIComponent(id)}`;

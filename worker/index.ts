@@ -110,6 +110,64 @@ async function search(q: string) {
   return out;
 }
 
+// ---------- genre tags via Radio Browser (radio-browser.info, open community database) ----------
+
+const RB = 'https://all.api.radio-browser.info/json';
+const RB_HEADERS = { 'User-Agent': 'ORBIT.FM/1.0 (+https://orbit-fm.orbit-fm.workers.dev)' };
+
+const tokens = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter((t) => t.length > 1);
+
+const STOP = new Set(['fm', 'am', 'radio', 'the', 'la', 'el', 'de', 'di', 'du', 'le', 'online', 'live', 'stream']);
+
+/** Best-effort genre tags for a radio.garden station, matched by name within its country. */
+async function tags(name: string, country: string): Promise<string[]> {
+  const nameTokens = tokens(name);
+  // Search on the distinctive words only: frequencies and filler words vary between databases.
+  const core = nameTokens.filter((t) => !STOP.has(t) && !/^\d+$/.test(t));
+  if (!core.length) return [];
+
+  // Names are often ordered differently between databases ("Techno Underground | Fluxmusic" vs
+  // "FluxFM - Techno Underground"), so widen the search with fewer words until something matches.
+  const attempts = [core.slice(0, 3), core.slice(0, 2), core.length > 1 ? core.slice(1, 3) : []]
+    .map((t) => t.join(' '))
+    .filter((q, i, all) => q && all.indexOf(q) === i);
+
+  let rows: { name: string; tags: string }[] = [];
+  for (const q of attempts) {
+    const qs = new URLSearchParams({ name: q, limit: '20', hidebroken: 'true', order: 'votes', reverse: 'true' });
+    if (country) qs.set('country', country);
+    const res = await fetch(`${RB}/stations/search?${qs}`, {
+      headers: RB_HEADERS,
+      cf: { cacheTtl: 7 * 24 * HOUR, cacheEverything: true },
+    } as RequestInit);
+    if (!res.ok) throw new HttpError(502, `radio-browser ${res.status}`);
+    rows = await res.json();
+    if (rows.length) break;
+  }
+
+  const want = new Set(nameTokens);
+  const scored = rows
+    .map((r) => {
+      const have = new Set(tokens(r.name));
+      const inter = [...want].filter((t) => have.has(t)).length;
+      return { r, score: inter / new Set([...want, ...have]).size };
+    })
+    .filter((x) => x.score >= 0.4 && x.r.tags)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  const out = new Set<string>();
+  for (const { r } of scored) for (const t of r.tags.split(',')) if (t.trim()) out.add(t.trim().toLowerCase());
+  return [...out].slice(0, 12);
+}
+
 /** Resolves the real stream URL behind radio.garden's listen redirect. */
 async function resolveStream(id: string): Promise<string> {
   const res = await fetch(`${RG}/ara/content/listen/${encodeURIComponent(id)}/channel.mp3`, {
@@ -150,6 +208,11 @@ async function api(req: Request, path: string): Promise<Response> {
     case 'search': {
       const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
       return json(q ? await search(q) : [], HOUR);
+    }
+    case 'tags': {
+      const name = (url.searchParams.get('name') ?? '').slice(0, 100);
+      const country = (url.searchParams.get('country') ?? '').slice(0, 60);
+      return json({ tags: name ? await tags(name, country) : [] }, 7 * 24 * HOUR);
     }
     case 'resolve':
       return json({ url: await resolveStream(arg) }, 0);

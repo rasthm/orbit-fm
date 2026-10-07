@@ -21,6 +21,7 @@ radio.garden's API is **unofficial and undocumented**. It sends no CORS headers 
 | `GET /api/places` | `ara/content/places` (compacted to arrays) | 12 h |
 | `GET /api/place/:id` | `ara/content/page/:id/channels` | 6 h |
 | `GET /api/search?q=` | `search?q=` | 1 h |
+| `GET /api/tags?name=&country=` | Radio Browser genre tags (fuzzy name match) | 7 d |
 | `GET /api/resolve/:id` | follows the `listen/:id/channel.mp3` redirect | none |
 | `GET /api/stream/:id` | pipes the audio itself (for `http://` or CORS-less streams) | none |
 
@@ -43,9 +44,21 @@ npx wrangler login
 npm run deploy       # builds, then `wrangler deploy` → https://orbit-fm.<your-subdomain>.workers.dev
 ```
 
+## Day & night
+
+ computes the subsolar point from the current UTC time and draws the night side as ten stacked
+caps (sun altitude 0° → −18°), giving a soft twilight gradient that moves in real time (refreshed every minute).
+
+## For You recommendations (all on-device)
+
+1. **Tracking**: every 5s of real playback is logged per station (time, 1min+ sessions, distinct days, quick skips).
+2. **Genres**: inferred from station names () plus Radio Browser tags looked up once per station you actually listen to.
+3. **Profile**: after 3 stations with 2+ minutes each; stations you return to on several days weigh more.
+4. **Picks**: radio.garden searches for your top genres / networks / countries, scored and diversified, shown as red rings on the globe and in Library → For you.
+
 ## Keyboard
 
-`Space` play/pause · `/` search · `N` / `P` next/previous · `R` random scan · `Esc` close
+ play/pause ·  search ·  /  next/previous ·  random scan ·  settings ·  close
 
 ## Roadmap
 
@@ -55,7 +68,11 @@ npm run deploy       # builds, then `wrangler deploy` → https://orbit-fm.<your
 - [x] Search, place sheet, favourites, recents, 8 cue pads, sleep timer, scan
 - [x] DJ deck: turntable, ring + bar visualisers (FFT or simulated), volume knob
 - [x] PWA: manifest, icons, offline app shell, tile/API caching, install prompt
-- [ ] Deploy to Cloudflare and test install on a real Android + iPhone
+- [x] Deploy to Cloudflare
+- [x] Real-time day/night globe with twilight gradient and sun marker
+- [x] Settings (globe, look, audio, discovery, data export/import)
+- [x] Listening tracker, taste profile, For You red-ring recommendations
+- [ ] Test install on a real Android + iPhone
 - [ ] Lighthouse pass (performance / accessibility)
 - [ ] Code-split MapLibre so the first paint is faster
 - [ ] Optional: "now playing" song titles (ICY metadata) via the Worker

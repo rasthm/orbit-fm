@@ -8,6 +8,7 @@ import {
   IconChevronDown, IconHeart, IconHeartFill, IconMoon, IconNext, IconPause, IconPlay, IconPrev,
   IconShuffle, IconTarget,
 } from './icons';
+import { settings } from '../settings';
 import { Knob } from './Knob';
 import { Visualizer } from './Visualizer';
 
@@ -53,7 +54,8 @@ function SleepButton() {
     return () => clearInterval(t);
   }, [sleepAt.value]);
 
-  const steps = [null, 15, 30, 60, 90];
+  const first = settings.value.sleepDefault;
+  const steps = [null, first, ...[15, 30, 60, 90].filter((m) => m > first)];
   const left = sleepAt.value ? Math.ceil((sleepAt.value - Date.now()) / 60_000) : null;
   const cycle = () => {
     const idx = left == null ? 0 : steps.findIndex((m) => m != null && m >= left);
@@ -113,7 +115,7 @@ function FullDeck() {
       </header>
 
       <div class={`platter-wrap${s === 'playing' ? ' is-spinning' : ''}`}>
-        <Visualizer mode="ring" class="ring-viz" />
+        {settings.value.visualizer === 'ring' && <Visualizer mode="ring" class="ring-viz" />}
         <div class="platter" onClick={() => { buzz(); togglePlay(); }}>
           <div class="platter-grooves" />
           <div class="platter-label">
@@ -122,6 +124,8 @@ function FullDeck() {
         </div>
         <div class="tonearm" aria-hidden="true" />
       </div>
+
+      {settings.value.visualizer === 'bars' && <Visualizer mode="bars" class="deck-bars" />}
 
       <div class="deck-info">
         <h2 class="deck-title marquee"><span>{st?.title ?? 'Pick a station'}</span></h2>
@@ -175,7 +179,7 @@ function MiniBar() {
   return (
     <div class="mini" onClick={() => (deckOpen.value = true)} role="button" tabIndex={0}
       aria-label="Open player deck" onKeyDown={(e) => e.key === 'Enter' && (deckOpen.value = true)}>
-      <Visualizer mode="bars" class="mini-viz" />
+      {settings.value.visualizer !== 'off' && <Visualizer mode="bars" class="mini-viz" />}
       <div class={`mini-disc${status.value === 'playing' ? ' is-spinning' : ''}`} aria-hidden="true" />
       <div class="mini-text">
         <span class="mini-title">{st.title}</span>

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Globe } from './components/Globe';
-import { IconLibrary, IconSearch } from './components/icons';
+import { IconLibrary, IconSearch, IconSettings } from './components/icons';
 import { LibraryPanel } from './components/LibraryPanel';
 import { PlacePanel } from './components/PlacePanel';
 import { PlayerDeck } from './components/PlayerDeck';
 import { SearchPanel } from './components/SearchPanel';
+import { SettingsPanel } from './components/SettingsPanel';
+import { settings } from './settings';
+import { profile, recs } from './taste';
 import {
   closePlace, deckOpen, loadPlaces, panel, places, placesError, scan, selectedPlace, step, togglePlay,
 } from './store';
@@ -46,6 +49,16 @@ function InstallButton() {
   );
 }
 
+function ForYouLegend() {
+  const s = settings.value;
+  if (!s.showForYou || !s.recommendations || !profile.value.ready || !recs.value.length) return null;
+  return (
+    <button class="legend glass-chip" onClick={() => (panel.value = 'library')} aria-label={`${recs.value.length} stations picked for you. Open list`}>
+      <span class="red-dot" /> For you · {recs.value.length}
+    </button>
+  );
+}
+
 function TopBar() {
   return (
     <header class="topbar">
@@ -60,6 +73,9 @@ function TopBar() {
         </button>
         <button class="icon-btn glass" aria-label="Library" onClick={() => (panel.value = 'library')}>
           <IconLibrary />
+        </button>
+        <button class="icon-btn glass" aria-label="Settings (,)" onClick={() => (panel.value = 'settings')}>
+          <IconSettings />
         </button>
       </div>
     </header>
@@ -84,6 +100,7 @@ function useShortcuts() {
         case 'n': step(1); break;
         case 'p': step(-1); break;
         case 'r': void scan(); break;
+        case ',': panel.value = 'settings'; break;
         case 'Escape':
           if (panel.value !== 'none') panel.value = 'none';
           else if (deckOpen.value) deckOpen.value = false;
@@ -104,8 +121,9 @@ export function App() {
     <div class={`app${deckOpen.value ? ' deck-open' : ''}`}>
       <Globe />
       <div class="vignette" aria-hidden="true" />
-      <div class="scanlines" aria-hidden="true" />
+      {settings.value.scanlines && <div class="scanlines" aria-hidden="true" />}
       <TopBar />
+      <ForYouLegend />
 
       {!places.value.length && !placesError.value && (
         <div class="boot"><span class="spinner" /> Mapping 38,000 stations…</div>
@@ -122,6 +140,7 @@ export function App() {
 
       {panel.value === 'search' && <SearchPanel />}
       {panel.value === 'library' && <LibraryPanel />}
+      {panel.value === 'settings' && <SettingsPanel />}
     </div>
   );
 }

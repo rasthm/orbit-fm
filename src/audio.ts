@@ -32,6 +32,8 @@ class AudioEngine {
   private connecting = false;
   private lastReconnect = 0;
 
+  fadeIn = true;
+
   onStatus: (s: PlayStatus, analysed: boolean) => void = () => {};
 
   constructor() {
@@ -135,7 +137,7 @@ class AudioEngine {
   private async tryAttempt({ src, cors }: Attempt, token: number): Promise<boolean> {
     this.stopElements();
     const el = cors ? this.corsEl : this.plainEl;
-    el.volume = this.volume;
+    el.volume = this.fadeIn ? 0 : this.volume;
     this.active = el;
 
     const isHls = /\.m3u8(\?|$)/i.test(src);
@@ -154,6 +156,7 @@ class AudioEngine {
         clearTimeout(timer);
         el.removeEventListener('playing', onOk);
         el.removeEventListener('error', onFail);
+        if (ok && token === this.token) this.rampIn(el, token);
         resolve(ok && token === this.token);
       };
       const onOk = () => done(true);
@@ -170,6 +173,22 @@ class AudioEngine {
         } else if (e?.name !== 'AbortError') onFail();
       });
     });
+  }
+
+  /** Smooth fade-in so switching stations doesn't blast. */
+  private rampIn(el: HTMLAudioElement, token: number) {
+    if (!this.fadeIn || document.hidden) return void (el.volume = this.volume);
+    const start = performance.now();
+    const DURATION = 1400;
+    // rAF stalls in background tabs; make sure we always end at full volume.
+    setTimeout(() => token === this.token && el === this.active && (el.volume = this.volume), DURATION + 300);
+    const step = (now: number) => {
+      if (token !== this.token || el !== this.active) return;
+      const t = Math.min(1, (now - start) / DURATION);
+      el.volume = this.volume * t * t;
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   private handleDrop() {

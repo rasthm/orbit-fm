@@ -1,0 +1,36 @@
+{
+  "name": "orbit-fm",
+  "version": "1.0.0",
+  "description": "ORBIT.FM — a techno-styled PWA web radio on a 3D globe, powered by radio.garden",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler dev --port 8787",
+    "build": "tsc -p . && tsc -p worker && vite build",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "icons": "pwa-assets-generator"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@preact/signals": "^2.11.3",
+    "hls.js": "^1.7.3",
+    "maplibre-gl": "^6.13.0",
+    "preact": "^11.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261007.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@vite-pwa/assets-generator": "^2.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vite-plugin-pwa": "^2.0.0",
+    "wrangler": "^4.148.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20261006.1": true
+  },
+  "private": true
+}

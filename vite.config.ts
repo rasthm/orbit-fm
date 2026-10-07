@@ -7,6 +7,7 @@ export default defineConfig({
     preact(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // registered from src/main.tsx so updates auto-reload the page
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'ORBIT.FM — Global Web Radio',

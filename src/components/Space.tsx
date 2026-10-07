@@ -200,14 +200,6 @@ function drawSun(g: CanvasRenderingContext2D, p: Pt, minSide: number, t: number)
   g.arc(p.x, p.y, r, 0, Math.PI * 2);
   g.fill();
   g.shadowBlur = 0;
-
-  // A faint anamorphic flare, very "camera in orbit".
-  const flare = g.createLinearGradient(p.x - r * 9, 0, p.x + r * 9, 0);
-  flare.addColorStop(0, 'rgba(120, 200, 255, 0)');
-  flare.addColorStop(0.5, 'rgba(200, 230, 255, 0.35)');
-  flare.addColorStop(1, 'rgba(120, 200, 255, 0)');
-  g.fillStyle = flare;
-  g.fillRect(p.x - r * 9, p.y - 1, r * 18, 2);
 }
 
 function drawMoon(g: CanvasRenderingContext2D, p: Pt | null, sun: Pt | null, lit: number, view: View) {
